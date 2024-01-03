@@ -173,6 +173,12 @@ def main():
                 extracted_texts = process_uploaded_pdfs(uploaded_files)
 
                 final_texts = extract_speakers_and_dialogues(extracted_texts)
+
+                if extract_text:
+                    st.dataframe(final_texts[['Filename','Speaker','Dialogue']])
+                    st.download_button('Download CSV', final_texts[['Filename','Speaker','Dialogue']].to_csv(index=False).encode('utf-8'), 'predicted.csv', 'text/csv', key='download-csv')
+                    return
+                
                 final_texts = filter_menteri(final_texts)
                 final_texts = remove_titles(final_texts, titles_to_remove)
                 final_texts = remove_seats_from_all_names(final_texts)
@@ -180,11 +186,6 @@ def main():
                 final_texts = preprocess_dialogue(final_texts)
                 if split_dialogue:
                     final_texts = tokenize_dialogues(final_texts)
-
-                if extract_text:
-                    st.dataframe(final_texts[['Filename','Speaker','Dialogue']])
-                    st.download_button('Download CSV', final_texts[['Filename','Speaker','Dialogue']].to_csv(index=False).encode('utf-8'), 'predicted.csv', 'text/csv', key='download-csv')
-                    return
 
                 if custom_model:
                     final_texts = predict_labels(final_texts, custom_vec, custom_clf, keywords=['minta', '?'])
@@ -202,7 +203,7 @@ def main():
                 st.download_button('Download CSV', final_texts[['Filename','Speaker','Dialogue','Label']].to_csv(index=False).encode('utf-8'), 'predicted.csv', 'text/csv', key='download-csv')
 
     with manual:
-        st.warning("[IN DEVELOPMENT] This features is coming soon!")
+        st.warning("[IN DEVELOPMENT] This features is coming soon! You can train your own custom model better than the default one provided by going here: https://colab.research.google.com/drive/17jFvLk04el440-FBjBaxq1NDrIlAMwdy")
 
 if __name__ == "__main__":
     main()
