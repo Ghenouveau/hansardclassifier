@@ -37,9 +37,9 @@ Open your web browser and go to `http://localhost:8501` to view the app.
 ## Usage
 - On the app's interface, upload a Hansard pdf file.
 - The app will process the text and automatically classify each sentences for you.
-- Use the default model or your own custom model.
+- Use the default model (93% accuracy) or your own custom model/datasets.
 
-## Train custom model using colab
+## For training custom model, use colab
 - You must check "just extract text" then go to colab for training.
 https://colab.research.google.com/drive/17jFvLk04el440-FBjBaxq1NDrIlAMwdy?usp=sharing
 
