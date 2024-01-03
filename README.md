@@ -18,7 +18,7 @@ To run this app, you'll need to install the required Python packages. Follow the
    ```
 2. Navigate to the app's directory.
    ```bash
-   cd your-repository-name
+   cd hansardclassifier
    ```
 3. Install the required packages.
    ```bash
@@ -29,7 +29,7 @@ To run this app, you'll need to install the required Python packages. Follow the
 After installation, you can run the app using Streamlit:
 
 ```bash
-streamlit run app.py
+streamlit run hansardclassifier.py
 ```
 
 Open your web browser and go to `http://localhost:8501` to view the app.
@@ -40,7 +40,7 @@ Open your web browser and go to `http://localhost:8501` to view the app.
 - Use the default model or your own custom model.
 
 ## Train custom model using colab
-- You must checked the "just extract text" to get the pdf that has been processed into csv then go to this link.
+- You must check "just extract text" then go to colab for training.
 https://colab.research.google.com/drive/17jFvLk04el440-FBjBaxq1NDrIlAMwdy?usp=sharing
 
 ## License
