@@ -8,6 +8,12 @@ from scipy.sparse import hstack
 import malaya
 import re
 from fuzzywuzzy import process
+from keras.models import load_model
+from keras.preprocessing.sequence import pad_sequences
+import json
+from keras.preprocessing.text import tokenizer_from_json
+import numpy as np
+from sklearn.preprocessing import LabelEncoder
 
 on = False
 def correct_names(correct_names_path, threshold=90):
@@ -55,6 +61,43 @@ def predict_labels(dataframe,vectorizer_path='default_vectorizer.pkl',classifier
 
     # Add predictions to the DataFrames
     dataframe['Label'] = predictions
+    return dataframe
+def predict_labels_nn(dataframe, model_path='default_model.h5', tokenizer_path='default_tokenizer.json', label_encoder_path='default_label_encoder.pkl', maxlen=280):
+    """
+    Predict labels for the given dataframe using a Neural Network model.
+    """
+    # Load the pre-trained Neural Network model
+    loaded_model = load_model(model_path)
+    
+    # Load the tokenizer
+    with open(tokenizer_path) as f:
+        data = json.load(f)
+        tokenizer = tokenizer_from_json(data)
+
+    # Load the label encoder
+    label_encoder = joblib.load(label_encoder_path)
+
+    # Ensure the Dialogue column is string type
+    dataframe['Dialogue'] = dataframe['Dialogue'].astype(str)
+
+    # Tokenize and pad the dialogues
+    dialogues_seq = tokenizer.texts_to_sequences(dataframe['Dialogue'])
+    dialogues_padded = pad_sequences(dialogues_seq, maxlen=maxlen)
+
+    # Make predictions using the Neural Network
+    predictions = loaded_model.predict(dialogues_padded)
+    predicted_label_indexes = np.argmax(predictions, axis=1)
+
+    # Transform predicted label indexes back to original labels
+    predicted_labels = label_encoder.inverse_transform(predicted_label_indexes)
+
+    # Add predicted labels to the DataFrame
+    dataframe['Label'] = predicted_labels
+
+    # Optionally, add probabilities for each class to the DataFrame
+    for i, class_label in enumerate(label_encoder.classes_):
+        dataframe[f'Probability_{class_label}'] = predictions[:, i]
+
     return dataframe
 def tokenize_dialogues(df):
     tokenizer = malaya.tokenizer.SentenceTokenizer()
@@ -165,6 +208,7 @@ def main():
             split_dialogue = st.checkbox("Split long dialogues into small pieces (more accurate result)", value=True)
             merge_dialogue = st.checkbox("Merge similar results together", value=True)
             custom_model = st.checkbox("Use Custom Model", value=False)
+        rf_or_nn = st.selectbox("Model", ["Random Forest", "Neural Network"])
         custom_vec = st.file_uploader("Use Custom Vectorizer",disabled=not custom_model, type="pkl")
         custom_clf = st.file_uploader("Use Custom Classifier",disabled=not custom_model, type="pkl")
         if st.button("Run",type="primary"):
@@ -186,11 +230,14 @@ def main():
                 final_texts = preprocess_dialogue(final_texts)
                 if split_dialogue:
                     final_texts = tokenize_dialogues(final_texts)
-
-                if custom_model:
-                    final_texts = predict_labels(final_texts, custom_vec, custom_clf, keywords=['minta', '?'])
-                else:    
-                    final_texts = predict_labels(final_texts)
+                
+                if rf_or_nn == "Random Forest":
+                    if custom_model:
+                        final_texts = predict_labels(final_texts, custom_vec, custom_clf, keywords=['minta', '?'])
+                    else:    
+                        final_texts = predict_labels(final_texts)
+                elif rf_or_nn == "Neural Network":
+                    final_texts = predict_labels_nn(final_texts)
                 
                 if merge_dialogue:
                     final_texts = merge_dialogues(final_texts)
@@ -201,9 +248,6 @@ def main():
                 st.dataframe(final_texts[['Filename','Speaker','Dialogue','Label']])
 
                 st.download_button('Download CSV', final_texts[['Filename','Speaker','Dialogue','Label']].to_csv(index=False).encode('utf-8'), 'predicted.csv', 'text/csv', key='download-csv')
-
-    with manual:
-        st.warning("[IN DEVELOPMENT] This features is coming soon! You can train your own custom model better than the default one provided by going here: https://colab.research.google.com/drive/17jFvLk04el440-FBjBaxq1NDrIlAMwdy")
 
 if __name__ == "__main__":
     main()
