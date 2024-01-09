@@ -3,6 +3,9 @@
 ## Introduction
 This Streamlit app is designed to automatically classify segments of Hansard text from the Malaysian Parliament into categories: 'Question', 'Motion', or 'None'. It utilizes a combination of TF-IDF (Term Frequency-Inverse Document Frequency) vectorization and a Random Forest classifier to analyze and categorize the text efficiently.
 
+## Online version
+https://hansardclassifiermy.streamlit.app/
+
 ## Features
 - Text classification into 'Question', 'Motion', or 'None'.
 - Utilizes TF-IDF for feature extraction from text.
