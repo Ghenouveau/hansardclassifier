@@ -7,11 +7,11 @@ from sklearn.feature_extraction.text import TfidfVectorizer
 from scipy.sparse import hstack
 import malaya
 import re
-from fuzzywuzzy import process
-from keras.models import load_model
-from keras.preprocessing.sequence import pad_sequences
 import json
-from keras.preprocessing.text import tokenizer_from_json
+from fuzzywuzzy import process
+from tensorflow.keras.models import load_model
+from tensorflow.keras.preprocessing.text import tokenizer_from_json
+from tensorflow.keras.preprocessing.sequence import pad_sequences
 import numpy as np
 from sklearn.preprocessing import LabelEncoder
 

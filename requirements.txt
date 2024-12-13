@@ -1,10 +1,31 @@
-fuzzywuzzy==0.18.0
-joblib==1.3.2
-malaya==5.0
-pandas==1.5.3
-pdfplumber==0.10.3
-scikit_learn==1.3.2
-scipy==1.11.4
-streamlit==1.29.0
-tensorflow >= 1.15.0
-torch >= 1.10
+# Core ML and data processing
+tensorflow==2.15.0  # Modern version compatible with recent Python
+torch==2.1.2  # For deep learning components
+scikit-learn==1.3.2  # For machine learning algorithms
+pandas==1.5.3  # For data manipulation
+numpy==1.24.3  # Required by TensorFlow and pandas
+scipy==1.11.4  # For scientific computing
+
+# PDF Processing
+pdfplumber==0.10.3  # For PDF text extraction
+pdf2image==1.16.3  # Required by pdfplumber for PDF processing
+Pillow==10.1.0  # Required for image processing
+
+# Text Processing
+malaya==5.0  # For Malaysian language processing
+fuzzywuzzy==0.18.0  # For string matching
+python-Levenshtein==0.23.0  # Required for better fuzzywuzzy performance
+regex==2023.10.3  # For advanced text processing
+nltk==3.8.1  # Required by malaya
+
+# Web Framework
+streamlit==1.29.0  # For web interface
+protobuf==4.25.1  # Required by TensorFlow and streamlit
+
+# Model Serialization
+joblib==1.3.2  # For model persistence
+
+# Additional Dependencies
+typing-extensions>=4.5.0  # Required by TensorFlow
+six>=1.16.0  # Required by TensorFlow
+packaging>=23.0  # Required by several packages
