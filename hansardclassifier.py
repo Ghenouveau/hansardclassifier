@@ -5,7 +5,8 @@ import pandas as pd
 import joblib
 from sklearn.feature_extraction.text import TfidfVectorizer
 from scipy.sparse import hstack
-import malaya
+from nltk.tokenize import sent_tokenize
+import nltk
 import re
 import json
 from fuzzywuzzy import process
@@ -14,6 +15,18 @@ from tensorflow.keras.preprocessing.text import tokenizer_from_json
 from tensorflow.keras.preprocessing.sequence import pad_sequences
 import numpy as np
 from sklearn.preprocessing import LabelEncoder
+
+def initialize_nltk():
+    """Initialize NLTK by downloading required data"""
+    try:
+        nltk.data.find('tokenizers/punkt')
+    except LookupError:
+        try:
+            nltk.download('punkt', quiet=True)
+        except Exception as e:
+            st.error("Could not download required NLTK data. Tokenization will be disabled.")
+            return False
+    return True
 
 on = False
 def correct_names(correct_names_path, threshold=90):
@@ -100,20 +113,38 @@ def predict_labels_nn(dataframe, model_path='default_model.h5', tokenizer_path='
 
     return dataframe
 def tokenize_dialogues(df):
-    tokenizer = malaya.tokenizer.SentenceTokenizer()
+    """
+    Tokenize dialogues into sentences using NLTK instead of Malaya.
+    Falls back to simple splitting if NLTK is unavailable.
+    """
     if 'Dialogue' not in df.columns:
         return df
 
-    # Tokenize dialogues and expand the DataFrame
+    # Initialize NLTK if not already done
+    nltk_available = initialize_nltk()
+
     all_rows = []
     for _, row in df.iterrows():
-        sentences = tokenizer.tokenize(row['Dialogue'])
-        for sentence in sentences:
-            new_row = row.copy()
-            new_row['Dialogue'] = sentence
-            all_rows.append(new_row)
-
+        try:
+            if nltk_available:
+                # Use NLTK's sent_tokenize
+                sentences = sent_tokenize(row['Dialogue'])
+            else:
+                # Fallback to simple splitting on periods
+                text = row['Dialogue']
+                sentences = [s.strip() for s in re.split(r'[.!?]+', text) if s.strip()]
+            
+            for sentence in sentences:
+                new_row = row.copy()
+                new_row['Dialogue'] = sentence
+                all_rows.append(new_row)
+        except Exception as e:
+            # If tokenization fails, keep the original text as is
+            all_rows.append(row)
+            
     return pd.DataFrame(all_rows)
+
+
 def extract_speakers_and_dialogues(extracted_texts):
     all_data = []
 
@@ -190,8 +221,9 @@ def merge_dialogues(df):
         grouped_texts.append(current_group)
 
     return pd.DataFrame(grouped_texts)
+
 def main():
-    titles_to_remove = ['Ts','Reformasi','Setiausaha','Institusi','Pengerusi','Dato\'','\’ ','Sri','Yang di-Pertua Dewan Rakyat',',','\‚Äô','\'','Timbalan Perdana Menteri', 'Menteri', 'Timbalan Menteri', 'Dato Sri', 'Datuk Seri', 'Datuk', 'Dato', 'Tuan', 'Puan', 'Dato Haji', "Dato' Haji", 'Datuk Haji', 'Datuk Seri Dr.', "Dato' Seri Dr.", 'Ir.', 'Tan Sri', 'Kapten', 'Dr.', 'Datuk Seri Utama', 'Datuk Seri Panglima', 'Tuan Haji', 'Puan Haji', "Tuan Syed", "Dato' Sri Haji", 'Yang Berhormat', 'Senator', 'Ahli Yang Berhormat']
+    titles_to_remove = ['Ts','Reformasi','Setiausaha','Institusi','Pengerusi','Dato\'','\' ','Sri','Yang di-Pertua Dewan Rakyat',',','\‚Äô','\'','Timbalan Perdana Menteri', 'Menteri', 'Timbalan Menteri', 'Dato Sri', 'Datuk Seri', 'Datuk', 'Dato', 'Tuan', 'Puan', 'Dato Haji', "Dato' Haji", 'Datuk Haji', 'Datuk Seri Dr.', "Dato' Seri Dr.", 'Ir.', 'Tan Sri', 'Kapten', 'Dr.', 'Datuk Seri Utama', 'Datuk Seri Panglima', 'Tuan Haji', 'Puan Haji', "Tuan Syed", "Dato' Sri Haji", 'Yang Berhormat', 'Senator', 'Ahli Yang Berhormat']
     st.title("Automatic Hansard Classifier")
     st.caption("By Ghakindye")
     auto, manual = st.tabs(["Automatic", "Manual"])
@@ -211,43 +243,110 @@ def main():
         rf_or_nn = st.selectbox("Model", ["Random Forest", "Neural Network"])
         custom_vec = st.file_uploader("Use Custom Vectorizer",disabled=not custom_model, type="pkl")
         custom_clf = st.file_uploader("Use Custom Classifier",disabled=not custom_model, type="pkl")
+
         if st.button("Run",type="primary"):
-            if process_uploaded_pdfs(uploaded_files) is not None:
+            if not uploaded_files:
+                st.error("Please upload at least one file")
+                return
 
+            try:
+                # Check 1: PDF extraction
                 extracted_texts = process_uploaded_pdfs(uploaded_files)
+                if not extracted_texts:
+                    st.error("No text could be extracted from the uploaded files")
+                    return
 
+                # Check 2: Speaker/Dialogue extraction
                 final_texts = extract_speakers_and_dialogues(extracted_texts)
+                if final_texts.empty:
+                    st.error("No speakers or dialogues could be identified in the text")
+                    return
 
+                if 'Speaker' not in final_texts.columns or 'Dialogue' not in final_texts.columns:
+                    st.error("Required columns 'Speaker' and 'Dialogue' not found in extracted text")
+                    return
+
+                # If just extracting text, validate before output
                 if extract_text:
+                    if len(final_texts) == 0:
+                        st.error("No valid text found to extract")
+                        return
                     st.dataframe(final_texts[['Filename','Speaker','Dialogue']])
                     st.download_button('Download CSV', final_texts[['Filename','Speaker','Dialogue']].to_csv(index=False).encode('utf-8'), 'predicted.csv', 'text/csv', key='download-csv')
                     return
-                
+
+                # Check 3: Filtering results
                 final_texts = filter_menteri(final_texts)
+                if final_texts.empty:
+                    st.error("No data remained after filtering ministers")
+                    return
+
                 final_texts = remove_titles(final_texts, titles_to_remove)
                 final_texts = remove_seats_from_all_names(final_texts)
 
+                # Check 4: Preprocessing results
                 final_texts = preprocess_dialogue(final_texts)
+                if final_texts['Dialogue'].str.len().max() == 0:
+                    st.error("All dialogues were empty after preprocessing")
+                    return
+
+                # Check 5: Tokenization
                 if split_dialogue:
-                    final_texts = tokenize_dialogues(final_texts)
-                
+                    if not initialize_nltk():
+                        st.warning("NLTK initialization failed. Proceeding without splitting dialogues.")
+                    else:
+                        final_texts = tokenize_dialogues(final_texts)
+                        if final_texts.empty:
+                            st.error("No valid dialogues after splitting")
+                            return
+
+                # Check 6: Model prediction
                 if rf_or_nn == "Random Forest":
                     if custom_model:
+                        if not (custom_vec and custom_clf):
+                            st.error("Please upload both vectorizer and classifier for custom model")
+                            return
                         final_texts = predict_labels(final_texts, custom_vec, custom_clf, keywords=['minta', '?'])
                     else:    
                         final_texts = predict_labels(final_texts)
                 elif rf_or_nn == "Neural Network":
                     final_texts = predict_labels_nn(final_texts)
-                
+
+                # Check 7: Prediction results
+                if 'Label' not in final_texts.columns:
+                    st.error("Classification failed - no labels generated")
+                    return
+
+                # Check 8: Merging results
                 if merge_dialogue:
                     final_texts = merge_dialogues(final_texts)
+                    if final_texts.empty:
+                        st.error("No data remained after merging dialogues")
+                        return
 
+                # Check 9: Name correction
                 if name_correction:
                     final_texts = correct_names(final_texts, threshold=90)
+                    if final_texts.empty:
+                        st.error("Name correction resulted in empty dataset")
+                        return
 
-                st.dataframe(final_texts[['Filename','Speaker','Dialogue','Label']])
+                # Final validation before output
+                if len(final_texts) == 0:
+                    st.error("No valid results to display")
+                    return
 
-                st.download_button('Download CSV', final_texts[['Filename','Speaker','Dialogue','Label']].to_csv(index=False).encode('utf-8'), 'predicted.csv', 'text/csv', key='download-csv')
+                required_columns = ['Filename','Speaker','Dialogue','Label']
+                if not all(col in final_texts.columns for col in required_columns):
+                    st.error("Missing required columns in final output")
+                    return
+
+                st.dataframe(final_texts[required_columns])
+                st.download_button('Download CSV', final_texts[required_columns].to_csv(index=False).encode('utf-8'), 'predicted.csv', 'text/csv', key='download-csv')
+
+            except Exception as e:
+                st.error(f"Error processing file: {str(e)}")
+                st.write("Please try again with a different file or check the file format")
 
 if __name__ == "__main__":
     main()
